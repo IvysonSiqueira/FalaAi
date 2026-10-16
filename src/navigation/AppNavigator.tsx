@@ -1,7 +1,11 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import { AppColors } from '../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp } from '../context/AppContext';
+import type { MainTabParamList, RootStackParamList } from '../types';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -10,31 +14,30 @@ import NewReportScreen from '../screens/NewReportScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ReportDetailScreen from '../screens/ReportDetailScreen';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#2563eb',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: AppColors.primary,
+        tabBarInactiveTintColor: AppColors.secondary,
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopColor: '#e2e8f0',
           borderTopWidth: 1,
-          height: 65,
-          paddingBottom: 8,
+          height: 76 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
-        },
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          alignItems: 'center',
         },
         tabBarLabelStyle: {
           fontSize: 12,
+          lineHeight: 16,
+          flexShrink: 0,
           fontWeight: '600',
           marginTop: 2,
         },
@@ -44,8 +47,9 @@ function MainTabs() {
         name="Início"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4, textAlign: 'center' }}>🏠</Text>
+          tabBarIcon: ({ color }) => (
+            <SymbolView name={{ ios: 'house.fill', android: 'home', web: 'home' }} size={24} tintColor={color}
+              accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
           ),
         }}
       />
@@ -53,8 +57,9 @@ function MainTabs() {
         name="Mapa"
         component={MapScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4, textAlign: 'center' }}>🗺️</Text>
+          tabBarIcon: ({ color }) => (
+            <SymbolView name={{ ios: 'map.fill', android: 'map', web: 'map' }} size={24} tintColor={color}
+              accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
           ),
         }}
       />
@@ -62,8 +67,9 @@ function MainTabs() {
         name="Perfil"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4, textAlign: 'center' }}>👤</Text>
+          tabBarIcon: ({ color }) => (
+            <SymbolView name={{ ios: 'person.fill', android: 'person', web: 'person' }} size={24} tintColor={color}
+              accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
           ),
         }}
       />
@@ -72,19 +78,24 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
+  const { currentUser } = useApp();
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#f8f5f0' },
         }}
       >
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="NewReport" component={NewReportScreen} />
-        <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+        {currentUser ? (
+          <Stack.Group navigationKey="signed-in">
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="NewReport" component={NewReportScreen} />
+            <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+          </Stack.Group>
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
