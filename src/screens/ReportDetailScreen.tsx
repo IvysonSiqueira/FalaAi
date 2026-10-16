@@ -1,69 +1,65 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, ScrollView, Text, View } from 'react-native';
+import { BackHeader, Button, Notice, ReportPhoto, Screen, StatusBadge, ui } from '../components/app-ui';
+import { getCategory } from '../constants/categories';
+import { useApp } from '../context/AppContext';
+import type { StackScreenProps } from '../types';
 
-export default function ReportDetailScreen({ route, navigation }: any) {
-  const { report } = route.params;
+export default function ReportDetailScreen({ route, navigation }: StackScreenProps<'ReportDetail'>) {
+  const { occurrences } = useApp();
+  const report = occurrences.find((item) => item.id === route.params?.reportId);
+  const [mapError, setMapError] = useState('');
+  const [opening, setOpening] = useState(false);
 
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>Detalhes da ocorrência</Text>
-      </View>
+  async function openExternalMap() {
+    if (!report?.coordinates || opening) return;
+    setOpening(true);
+    setMapError('');
+    try {
+      const { latitude, longitude } = report.coordinates;
+      await Linking.openURL(`https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`);
+    } catch {
+      setMapError('Não foi possível abrir o mapa externo. Consulte as coordenadas abaixo.');
+    } finally {
+      setOpening(false);
+    }
+  }
 
-      <View style={styles.content}>
-        {report.photo && (
-          <View style={styles.photoContainer}>
-            <Image source={{ uri: report.photo }} style={styles.reportImage} />
-          </View>
-        )}
-
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.categoryLabel}>{report.category}</Text>
-            <View style={styles.badge}><Text style={styles.badgeText}>{report.status}</Text></View>
-          </View>
-
-          <Text style={styles.title}>{report.title}</Text>
-          <Text style={styles.description}>{report.description}</Text>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Local:</Text>
-            <Text style={styles.infoValue}>{report.location}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Registrado por:</Text>
-            {/* Exibe o autor real do chamado */}
-            <Text style={styles.infoValueHighlight}>{report.author || 'Cidadão'}</Text>
-          </View>
+  return <Screen>
+    <BackHeader title="Detalhes da ocorrência" onBack={() => navigation.goBack()} />
+    <ScrollView contentContainerStyle={ui.content}>
+      {!report ? <View style={ui.card}><Text style={ui.label}>Ocorrência não encontrada</Text>
+        <Notice>O registro não está disponível nesta sessão. Volte e selecione outra ocorrência.</Notice>
+        <Button title="Voltar" onPress={() => navigation.goBack()} />
+      </View> : <>
+        <View style={ui.card}>
+          <StatusBadge status={report.status} />
+          <Text style={ui.title}>{report.title || getCategory(report.categoryId).label}</Text>
+          {report.title && report.title !== getCategory(report.categoryId).label && <Text style={ui.subtitle}>{getCategory(report.categoryId).label}</Text>}
+          <Text style={ui.body}>{report.description}</Text>
         </View>
-      </View>
+        {report.photo ? <ReportPhoto uri={report.photo} /> : <View style={ui.card}><Notice>Este relato não possui foto. A fotografia é opcional.</Notice></View>}
+        <View style={ui.card}>
+          <Text style={ui.sectionTitle}>Localização</Text>
+          <Text selectable style={ui.body}>{report.location?.trim() || (report.coordinates ? 'Local registrado por GPS' : 'Endereço não informado')}</Text>
+          {report.coordinates ? <>
+            <View style={ui.field}>
+              <Text style={ui.label}>Coordenadas GPS</Text>
+              <Text selectable style={ui.subtitle}>Latitude: {report.coordinates.latitude.toFixed(6)}{'\n'}Longitude: {report.coordinates.longitude.toFixed(6)}</Text>
+            </View>
+            <Button title="Abrir no OpenStreetMap" secondary busy={opening} onPress={() => void openExternalMap()} />
+            {mapError ? <Notice error>{mapError}</Notice> : null}
+          </> : <Notice>Endereço manual: não há coordenadas GPS associadas a este registro.</Notice>}
+        </View>
+        <View style={ui.card}>
+          <Text style={ui.sectionTitle}>Sobre o registro</Text>
+          <View style={ui.field}><Text style={ui.label}>Registrado por</Text><Text style={ui.body}>{report.author}</Text></View>
+          {report.createdAt && Number.isFinite(Date.parse(report.createdAt)) ? <View style={ui.field}>
+            <Text style={ui.label}>Data do registro</Text><Text style={ui.subtitle}>{new Date(report.createdAt).toLocaleString('pt-BR')}</Text>
+          </View> : null}
+        </View>
+        <Notice>Registro demonstrativo local. Nenhuma ocorrência é enviada à prefeitura. Os dados ficam apenas nesta sessão do aplicativo.</Notice>
+      </>}
     </ScrollView>
-  );
+  </Screen>;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f5f0' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 50, paddingHorizontal: 20, paddingBottom: 15, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  backButtonText: { fontSize: 26, color: '#0b132b', marginTop: -4 },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#0b132b' },
-  content: { padding: 20 },
-  photoContainer: { height: 220, borderRadius: 20, overflow: 'hidden', marginBottom: 20, backgroundColor: '#e2e8f0' },
-  reportImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  card: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  categoryLabel: { fontSize: 13, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' },
-  badge: { backgroundColor: '#dbeafe', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '700', color: '#1d4ed8' },
-  title: { fontSize: 20, fontWeight: '900', color: '#0b132b', marginBottom: 8 },
-  description: { fontSize: 14, color: '#475569', lineHeight: 22, marginBottom: 20 },
-  divider: { height: 1, backgroundColor: '#f1f5f9', marginBottom: 16 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  infoLabel: { fontSize: 13, color: '#64748b' },
-  infoValue: { fontSize: 13, fontWeight: '700', color: '#0b132b' },
-  infoValueHighlight: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
-});

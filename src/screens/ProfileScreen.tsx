@@ -1,193 +1,58 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button, Notice, Screen, ui } from '../components/app-ui';
+import { AppColors as colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 
-export default function ProfileScreen({ navigation }: any) {
-  const { currentUser, occurrences } = useApp();
-  
-  // Filtra apenas as ocorrências do usuário logado atual
-  const mine = occurrences.filter((item: any) => item.author === currentUser.name);
+export default function ProfileScreen() {
+  const { currentUser, occurrences, signOut } = useApp();
+  if (!currentUser) return null;
+  const mine = occurrences.filter((report) => report.authorId === currentUser.id);
+  const resolved = mine.filter((report) => report.status === 'Resolvida').length;
+  const open = mine.length - resolved;
 
-  function handleLogout() {
-    navigation.replace('Login');
-  }
-
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Perfil</Text>
+  return <Screen tab><ScrollView contentContainerStyle={ui.content}>
+    <Text style={ui.title}>Seu perfil</Text>
+    <View style={styles.userCard}>
+      <View style={styles.avatar}><Text style={styles.initial}>{currentUser.name.charAt(0).toUpperCase()}</Text></View>
+      <View style={styles.identity}><Text style={styles.name}>{currentUser.name}</Text><Text selectable style={styles.email}>{currentUser.email}</Text></View>
+    </View>
+    <View style={ui.card}>
+      <Text style={ui.sectionTitle}>Seus relatos</Text>
+      <View style={styles.totalSummary}>
+        <Text style={styles.total}>{mine.length}</Text>
+        <Text style={ui.body}>{mine.length === 1 ? 'ocorrência registrada' : 'ocorrências registradas'}</Text>
+        <Text style={ui.subtitle}>Nesta sessão do aplicativo</Text>
       </View>
-
-      <View style={styles.content}>
-        <View style={styles.userCard}>
-          <View style={styles.avatarBox}>
-            <Text style={styles.avatarText}>{currentUser.name.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{currentUser.name}</Text>
-            <Text style={styles.userEmail}>{currentUser.email}</Text>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{mine.length}</Text>
-            <Text style={styles.statLabel}>Registradas</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Resolvidas</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Informações do sistema</Text>
-        
-        <View style={styles.infoBox}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Cidade</Text>
-            <Text style={styles.infoValue}>Cidade Nova</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Versão</Text>
-            <Text style={styles.infoValue}>1.0 · protótipo</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Sobre</Text>
-            <Text style={styles.infoValue}>Participação cidadã</Text>
-          </View>
-        </View>
-
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Sair</Text>
-        </Pressable>
+      <View style={styles.stats}>
+        <View style={styles.stat}><Text style={styles.statNumber}>{open}</Text><Text style={ui.subtitle}>Em aberto</Text></View>
+        <View style={styles.stat}><Text style={[styles.statNumber, { color: colors.success }]}>{resolved}</Text><Text style={ui.subtitle}>Resolvidas</Text></View>
       </View>
-    </ScrollView>
-  );
+      <Notice>Novos relatos começam como “Aberta”. O protótipo não possui acompanhamento da prefeitura nem atualização de status.</Notice>
+    </View>
+    <View style={ui.card}>
+      <Text style={ui.sectionTitle}>Sobre o FalaAí</Text>
+      <Text style={ui.body}>Participação cidadã com foto e localização.</Text>
+      <Text style={ui.subtitle}>Versão 1.0 · protótipo acadêmico</Text>
+      <View style={styles.academic}>
+        <Text style={ui.label}>Dados temporários</Text>
+        <Notice>Login demonstrativo, sem autenticação de produção. Ao sair, a sessão é encerrada. Cadastros, senhas e ocorrências ficam apenas na memória e são apagados ao reiniciar o aplicativo. Não use senhas reais.</Notice>
+        <Notice>Fotos podem usar arquivos temporários do aparelho. Não há garantia de conservação após encerrar o aplicativo.</Notice>
+      </View>
+    </View>
+    <Button title="Sair da conta" destructive onPress={signOut} />
+  </ScrollView></Screen>;
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f5f0',
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#0b132b',
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  userCard: {
-    backgroundColor: '#0b132b',
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatarBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  userEmail: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  statNumber: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#0b132b',
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0b132b',
-    marginBottom: 12,
-  },
-  infoBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 24,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f1f5f9',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0b132b',
-  },
-  logoutButton: {
-    backgroundColor: '#fee2e2',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-  },
-  logoutButtonText: {
-    color: '#dc2626',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  userCard: { backgroundColor: colors.navy, borderRadius: 20, padding: 20, gap: 16 },
+  avatar: { width: 52, height: 52, backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  initial: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  identity: { gap: 6, alignSelf: 'stretch' },
+  name: { color: '#fff', fontSize: 24, lineHeight: 32, fontWeight: '800' },
+  email: { color: '#cbd5e1', fontSize: 15, lineHeight: 22, flexShrink: 1 },
+  totalSummary: { gap: 4, alignSelf: 'stretch' },
+  total: { color: colors.navy, fontSize: 32, fontWeight: '800' },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  stat: { flexGrow: 1, flexBasis: 100, backgroundColor: colors.background, borderRadius: 12, padding: 12, gap: 4 },
+  statNumber: { color: colors.primary, fontSize: 24, fontWeight: '800' },
+  academic: { borderTopWidth: 1, borderTopColor: colors.subtleBorder, paddingTop: 12, gap: 8 },
 });
