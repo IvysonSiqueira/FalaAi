@@ -1,3 +1,6 @@
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import OccurrenceFeedback from '../components/occurrence-feedback';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { AppColors as colors } from '../constants/theme';
@@ -5,7 +8,9 @@ import { Screen, OccurrenceCard, ui } from '../components/app-ui';
 import type { TabScreenProps } from '../types';
 
 export default function HomeScreen({ navigation }: TabScreenProps<'Início'>) {
-  const { currentUser, occurrences } = useApp();
+  const { currentUser, occurrences, occurrencesLoading, occurrencesError, refreshOccurrences } = useApp();
+  useFocusEffect(useCallback(() => { void refreshOccurrences(); }, [refreshOccurrences]));
+  const countUnavailable = occurrences.length === 0 && (occurrencesLoading || !!occurrencesError);
   if (!currentUser) return null;
   const mine = occurrences.filter((item) => item.authorId === currentUser.id);
   const openCount = mine.filter((item) => item.status !== 'Resolvida').length;
@@ -19,6 +24,8 @@ export default function HomeScreen({ navigation }: TabScreenProps<'Início'>) {
         style={styles.container}
         contentContainerStyle={styles.listContent}
         data={mine}
+        refreshing={occurrencesLoading}
+        onRefresh={() => void refreshOccurrences()}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <>
@@ -45,18 +52,19 @@ export default function HomeScreen({ navigation }: TabScreenProps<'Início'>) {
 
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statNumber, { color: '#d97706' }]}>{openCount}</Text>
+                  <Text style={[styles.statNumber, { color: '#d97706' }]}>{countUnavailable ? '—' : openCount}</Text>
                   <Text style={styles.statLabel}>Em aberto</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statNumber, { color: '#15803d' }]}>{resolvedCount}</Text>
+                  <Text style={[styles.statNumber, { color: '#15803d' }]}>{countUnavailable ? '—' : resolvedCount}</Text>
                   <Text style={styles.statLabel}>Resolvidas</Text>
                 </View>
               </View>
 
+              <OccurrenceFeedback loading={occurrencesLoading} error={occurrencesError} hasItems={occurrences.length > 0} onRefresh={refreshOccurrences} />
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Suas ocorrências</Text>
-                <Text style={styles.sectionTotal}>{mine.length} no total</Text>
+                <Text style={styles.sectionTotal}>{countUnavailable ? '—' : mine.length} no total</Text>
               </View>
             </View>
           </>
@@ -67,7 +75,7 @@ export default function HomeScreen({ navigation }: TabScreenProps<'Início'>) {
           </View>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
+        ListEmptyComponent={occurrencesLoading || occurrencesError ? null :
           <View style={styles.listItem}>
             <Text style={styles.emptyText}>Nenhuma ocorrência registrada ainda.</Text>
           </View>

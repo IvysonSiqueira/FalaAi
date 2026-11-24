@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { ActivityIndicator, ScrollView } from 'react-native';
+import { Button, Notice, Screen, ui } from '../components/app-ui';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -78,7 +81,24 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const { currentUser } = useApp();
+  const { currentUser, authLoading, authError, retryAuth, signOut } = useApp();
+  const [leaving, setLeaving] = useState(false);
+  const [exitError, setExitError] = useState<string | null>(null);
+  async function leave() {
+    setLeaving(true);
+    setExitError(null);
+    try { await signOut(); }
+    catch (error) { setExitError(error instanceof Error ? error.message : 'Não foi possível sair.'); }
+    finally { setLeaving(false); }
+  }
+  if (authLoading || authError) return <Screen><ScrollView contentContainerStyle={ui.content}>
+    {authLoading ? <><ActivityIndicator color={AppColors.primary} /><Notice>Restaurando sua sessão…</Notice></> : <>
+      <Notice error>{authError}</Notice>
+      {exitError && <Notice error>{exitError}</Notice>}
+      <Button title="Tentar novamente" disabled={leaving} onPress={retryAuth} />
+      <Button title="Sair da sessão" secondary busy={leaving} onPress={leave} />
+    </>}
+  </ScrollView></Screen>;
   return (
     <NavigationContainer>
       <Stack.Navigator

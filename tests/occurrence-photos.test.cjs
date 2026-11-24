@@ -1,0 +1,28 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {decodePhoto,createOccurrencePhotos}=require('../src/services/occurrence-photos.ts');
+const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jB9kAAAAASUVORK5CYII=';
+const selection={uri:'file:///local.png',base64:png,mimeType:'image/png',fileSize:68};
+const owner='11111111-1111-4111-8111-111111111111';const path=owner+'/22222222-2222-4222-8222-222222222222.png';
+function fake(overrides={}){const calls=[];const client={from:()=>({select:()=>({eq:async()=>({count:0,error:null})})}),rpc:async(name,args)=>{calls.push([name,args]);if(name==='reserve_occurrence_photo')return{data:path,error:null};if(name==='claim_occurrence_photo_cleanup')return{data:[path],error:null};return{data:true,error:null};},storage:{from(bucket){calls.push(['bucket',bucket]);return{upload:async(...args)=>{calls.push(['upload',...args]);return{error:null};},remove:async(paths)=>{calls.push(['remove',paths]);return{data:[],error:null};},createSignedUrl:async(...args)=>{calls.push(['sign',...args]);return{data:{signedUrl:'https://example.test/signed-private-fixture'},error:null};},...overrides};}}};return{client,calls};}
+test('Base64 é convertido em ArrayBuffer e tipo é verificado pelos bytes, sem Blob/FormData',()=>{const result=decodePhoto(selection);assert.ok(result.bytes instanceof ArrayBuffer);assert.equal(result.mimeType,'image/png');assert.equal(result.extension,'png');assert.equal(new Uint8Array(result.bytes)[0],137);});
+test('recusa arquivo vazio, formato inválido, MIME não permitido e tamanho maior que 5 MiB',()=>{for(const value of [{...selection,base64:''},{...selection,base64:'not-base64!'},{...selection,base64:Buffer.from('<svg>bad</svg>').toString('base64')},{...selection,mimeType:'image/svg+xml'},{...selection,fileSize:5242881},{...selection,base64:'A'.repeat(7000000)}])assert.throws(()=>decodePhoto(value));});
+test('reserva remota precede upload único e sem upsert',async()=>{const{client,calls}=fake();assert.equal(await createOccurrencePhotos(client).upload(selection),path);assert.equal(calls[0][0],'reserve_occurrence_photo');const upload=calls.find(c=>c[0]==='upload');assert.ok(upload[2]instanceof ArrayBuffer);assert.equal(upload[3].contentType,'image/png');assert.equal(upload[3].upsert,false);assert.ok(calls.findIndex(c=>c[0]==='confirm_occurrence_photo_upload')>calls.findIndex(c=>c[0]==='upload'));});
+test('falha de upload marca reserva para recuperação e não informa sucesso',async()=>{const{client,calls}=fake({upload:async()=>({error:{message:'private error'}})});await assert.rejects(createOccurrencePhotos(client).upload(selection),/enviar.*foto/);assert.ok(calls.some(c=>c[0]==='abandon_occurrence_photo'));});
+test('limpeza usa API Storage e só conclui após conferência remota de ausência',async()=>{const{client,calls}=fake();assert.equal(await createOccurrencePhotos(client).cleanup(),false);assert.ok(calls.some(c=>c[0]==='remove'));assert.ok(calls.some(c=>c[0]==='finish_occurrence_photo_cleanup'));});
+test('erro de exclusão preserva trabalho pendente e não encerra registro de recuperação',async()=>{const{client,calls}=fake({remove:async()=>({error:{message:'network'}})});assert.equal(await createOccurrencePhotos(client).cleanup(),true);assert.ok(!calls.some(c=>c[0]==='finish_occurrence_photo_cleanup'));});
+test('Storage pode omitir objetos sem permissão: finish=false mantém pendência',async()=>{const{client}=fake();const original=client.rpc;client.rpc=async(name,args)=>name==='finish_occurrence_photo_cleanup'?{data:false,error:null}:original(name,args);assert.equal(await createOccurrencePhotos(client).cleanup(),true);});
+test('URL assinada tem validade curta e não é confundida com caminho persistido',async()=>{const{client,calls}=fake();assert.match(await createOccurrencePhotos(client).signedUrl(path),/^https:/);assert.deepEqual(calls.find(c=>c[0]==='sign').slice(1),[path,600]);});
+test('não assina caminho local, externo ou com navegação de diretório',async()=>{const{client,calls}=fake();for(const value of ['file:///local.jpg','https://example.test/a.jpg',owner+'/../other.png'])await assert.rejects(createOccurrencePhotos(client).signedUrl(value));assert.equal(calls.length,0);});
+test('reservas abandonadas com limpeza adiada continuam visíveis como pendência',async()=>{const{client}=fake();const original=client.rpc;client.rpc=async(name,args)=>name==='claim_occurrence_photo_cleanup'?{data:[],error:null}:original(name,args);client.from=()=>({select:()=>({eq:async()=>({count:1,error:null})})});assert.equal(await createOccurrencePhotos(client).cleanup(),true);});
+test('decoder preserva os bytes e detecta JPEG/WebP sem confiar na extensão local',()=>{
+ for(const bytes of [Buffer.from([255,216,255,224,0,16,74,70,73,70]),Buffer.from('RIFF1234WEBPVP8 fixture bytes'),Buffer.from(png,'base64')]){
+  const result=decodePhoto({uri:'file:///nome-enganoso.txt',base64:bytes.toString('base64')});assert.deepEqual(Buffer.from(result.bytes),bytes);
+ }
+});
+test('erro ao confirmar upload não informa arquivo pronto e preserva reserva de recuperação',async()=>{
+ const{client,calls}=fake();const original=client.rpc;client.rpc=async(name,args)=>name==='confirm_occurrence_photo_upload'?{data:false,error:null}:original(name,args);
+ await assert.rejects(createOccurrencePhotos(client).upload(selection),/enviar.*foto/);assert.ok(calls.some(c=>c[0]==='abandon_occurrence_photo'));
+});
+test('limpezas concorrentes compartilham a mesma execução',async()=>{
+ const{client,calls}=fake();const photos=createOccurrencePhotos(client);await Promise.all([photos.cleanup(),photos.cleanup()]);assert.equal(calls.filter(c=>c[0]==='claim_occurrence_photo_cleanup').length,1);
+});
