@@ -1,0 +1,5 @@
+# Preparação local. Não executa link, deploy ou migrações automaticamente.
+[functions.delete-account]
+entrypoint = "./functions/delete-account/index.js"
+# Publishable keys não são JWTs; a função valida o JWT do usuário por getUser.
+verify_jwt = false

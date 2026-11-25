@@ -17,12 +17,17 @@ export type Occurrence = {
   coordinates: Coordinates | null;
   status: OccurrenceStatus;
   photo: string | null;
+  photoPath: string | null;
   createdAt: string;
 };
+// Somente campos editáveis; proprietário, UUID, status e datas vêm do servidor.
+export type SelectedPhoto = { uri: string; base64: string; mimeType?: string; fileSize?: number };
+// undefined mantém foto; null remove; objeto selecionado substitui.
+export type OccurrenceDraft = Pick<Occurrence, 'categoryId' | 'description' | 'location' | 'coordinates'> & { photoChange?: SelectedPhoto | null };
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
-  NewReport: undefined;
+  NewReport: { reportId: string } | undefined;
   ReportDetail: { reportId: string };
 };
 export type MainTabParamList = { Início: undefined; Mapa: undefined; Perfil: undefined };

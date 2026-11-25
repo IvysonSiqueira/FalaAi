@@ -52,3 +52,9 @@ credentials.json
 *.keystore
 *.apk
 *.aab
+
+# Supabase CLI local cache (não é código nem migração)
+supabase/.temp/
+
+# Evidências locais de testes, fora do grafo Metro e do Git
+.artifacts/

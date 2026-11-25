@@ -5,21 +5,32 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BackHeader, Button, Notice, ReportPhoto, Screen, ui } from '../components/app-ui';
 import { AppColors as colors } from '../constants/theme';
+import StoredReportPhoto from '../components/stored-report-photo';
+import { decodePhoto } from '../services/occurrence-photos';
 import { CATEGORIES } from '../constants/categories';
 import { useApp } from '../context/AppContext';
-import type { CategoryId, Coordinates, StackScreenProps } from '../types';
-import { createOccurrenceId } from '../utils/validation';
+import type { CategoryId, Coordinates, SelectedPhoto, StackScreenProps } from '../types';
 
 type FormErrors = { description?: string; location?: string; form?: string };
 
-export default function NewReportScreen({ navigation }: StackScreenProps<'NewReport'>) {
-  const { currentUser, addOccurrence } = useApp();
+export default function NewReportScreen(props: StackScreenProps<'NewReport'>) {
+  const { currentUser } = useApp();
+  return <ReportForm key={`${currentUser?.id ?? ''}:${props.route.params?.reportId ?? 'new'}`} {...props} />;
+}
+function ReportForm({ route, navigation }: StackScreenProps<'NewReport'>) {
+  const { currentUser, addOccurrence, updateOccurrence, loadOccurrence } = useApp();
+  const reportId = route.params?.reportId;
+  const [loading, setLoading] = useState(!!reportId);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [categoryId, setCategoryId] = useState<CategoryId>('buraco');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'camera' | 'gallery' | 'gps' | null>(null);
+  const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
+  const [storedPhotoPath, setStoredPhotoPath] = useState<string | null>(null);
+  const [removeStoredPhoto, setRemoveStoredPhoto] = useState(false);
+  const [busy, setBusy] = useState<'camera' | 'gallery' | 'gps' | 'saving' | null>(null);
   const [photoError, setPhotoError] = useState('');
   const [gpsError, setGpsError] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
@@ -38,6 +49,26 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
     return () => { mounted.current = false; cancelLocation.current?.(); };
   }, []);
 
+  useEffect(() => {
+    if (!reportId) return;
+    let active = true;
+    void loadOccurrence(reportId).then((report) => {
+      if (!active) return;
+      if (!report) throw new Error('Ocorrência não encontrada. Ela pode ter sido excluída.');
+      if (report.authorId !== currentUser?.id) throw new Error('Somente o proprietário pode editar esta ocorrência.');
+      setCategoryId(report.categoryId);
+      setDescription(report.description);
+      setLocation(report.location);
+      setCoordinates(report.coordinates);
+      setStoredPhotoPath(report.photoPath);
+      setRemoveStoredPhoto(false);
+      setPhoto(null);
+    }).catch((error: unknown) => {
+      if (active) setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar a ocorrência.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [reportId, currentUser?.id, loadOccurrence, loadAttempt]);
+
   async function pickImage(source: 'camera' | 'gallery') {
     if (operation.current || submitted.current) return;
     operation.current = true;
@@ -53,11 +84,21 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
       }
       if (!mounted.current) return;
       // Sem editor nativo ou aspect: mantém o enquadramento entregue pela câmera/galeria.
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false, quality: 1 };
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false, quality: 1, base64: true };
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
-      if (mounted.current && !result.canceled && result.assets[0]) setPhoto(result.assets[0].uri);
+      if (mounted.current && !result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const selected: SelectedPhoto = { uri: asset.uri, base64: asset.base64 ?? '', mimeType: asset.mimeType ?? undefined, fileSize: asset.fileSize ?? undefined };
+        try { decodePhoto(selected); }
+        catch (validationError) {
+          setPhotoError(validationError instanceof Error ? validationError.message : 'Fotografia inválida.');
+          return;
+        }
+        setPhoto(selected);
+        setRemoveStoredPhoto(false);
+      }
     } catch {
       if (mounted.current) setPhotoError('Não foi possível abrir a imagem. Tente novamente ou use a outra opção.');
     } finally {
@@ -108,8 +149,8 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
     }
   }
 
-  function handleSubmit() {
-    if (operation.current || submitted.current) return;
+  async function handleSubmit() {
+    if (operation.current || submitted.current || loading || loadError) return;
     const nextErrors: FormErrors = {};
     if (description.trim().length < 20) nextErrors.description = 'Escreva pelo menos 20 caracteres úteis na descrição.';
     if (!location.trim() && !coordinates) nextErrors.location = 'Informe o endereço ou capture a localização pelo GPS.';
@@ -121,37 +162,45 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
     }
     Keyboard.dismiss();
     submitted.current = true;
+    setBusy('saving');
     try {
-      const category = CATEGORIES.find((item) => item.id === categoryId);
-      if (!category) throw new Error('Selecione uma categoria válida.');
-      addOccurrence({
-        id: createOccurrenceId(), authorId: currentUser.id, author: currentUser.name,
-        categoryId, title: category.label, description: description.trim(),
-        location: location.trim() || 'Localização registrada por GPS (sem endereço informado)',
-        coordinates, photo, status: 'Aberta', createdAt: new Date().toISOString(),
-      });
-      setSaved(true);
+      const draft = { categoryId, description: description.trim(), location: location.trim(), coordinates, photoChange: photo ?? (removeStoredPhoto ? null : undefined) };
+      if (reportId) await updateOccurrence(reportId, draft);
+      else await addOccurrence(draft);
+      if (mounted.current) setSaved(true);
     } catch (error) {
       submitted.current = false;
-      setErrors({ form: error instanceof Error ? error.message : 'Não foi possível salvar a ocorrência.' });
+      if (mounted.current) setErrors({ form: error instanceof Error ? error.message : 'Não foi possível salvar a ocorrência.' });
+    } finally {
+      if (mounted.current) setBusy(null);
     }
   }
 
-  if (saved) return <Screen><BackHeader title="Ocorrência registrada" onBack={() => navigation.goBack()} />
+  if (loading || loadError) return <Screen>
+    <BackHeader title="Editar ocorrência" onBack={() => navigation.goBack()} />
+    <ScrollView contentContainerStyle={ui.content}>
+      {loading ? <Notice>Carregando ocorrência…</Notice> : <>
+        <Notice error>{loadError}</Notice>
+        <Button title="Tentar novamente" onPress={() => { setLoading(true); setLoadError(null); setLoadAttempt((value) => value + 1); }} />
+      </>}
+    </ScrollView>
+  </Screen>;
+
+  if (saved) return <Screen><BackHeader title={reportId ? "Ocorrência atualizada" : "Ocorrência registrada"} onBack={() => navigation.goBack()} />
     <ScrollView contentContainerStyle={[ui.content, styles.successContent]}><View style={[ui.card, styles.successCard]}>
       <View style={styles.successIcon} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><SymbolView name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }} tintColor={colors.success} size={48} accessible={false} /></View>
-      <Text style={ui.title}>Ocorrência registrada!</Text>
-      <Notice>Seu relato já está na lista. Os dados ficam apenas nesta sessão e são apagados ao reiniciar o aplicativo. O registro é demonstrativo e não é enviado à prefeitura.</Notice>
-      <Button title="Voltar ao início" onPress={() => navigation.popTo('MainTabs')} />
+      <Text style={ui.title}>{reportId ? 'Ocorrência atualizada!' : 'Ocorrência registrada!'}</Text>
+      <Notice>Seu relato foi confirmado pelo Supabase e permanecerá após reiniciar o aplicativo. Nenhuma ocorrência é enviada à prefeitura. Quando selecionada, a fotografia também foi enviada e vinculada ao relato no Storage privado.</Notice>
+      <Button title={reportId ? "Voltar aos detalhes" : "Voltar ao início"} onPress={() => reportId ? navigation.goBack() : navigation.popTo('MainTabs')} />
     </View></ScrollView></Screen>;
 
   return <Screen keyboard>
-    <BackHeader title="Nova ocorrência" onBack={() => navigation.goBack()} />
+    <BackHeader title={reportId ? "Editar ocorrência" : "Nova ocorrência"} onBack={() => navigation.goBack()} />
     <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={ui.content}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tipo do problema</Text>
         <View style={styles.grid}>
-          {CATEGORIES.map((category) => <Pressable key={category.id} accessibilityRole="radio" accessibilityState={{ checked: categoryId === category.id }}
+          {CATEGORIES.map((category) => <Pressable key={category.id} disabled={busy !== null} accessibilityRole="radio" accessibilityState={{ checked: categoryId === category.id }}
             onPress={() => setCategoryId(category.id)} style={({ pressed }) => [styles.category, categoryId === category.id && styles.selected, pressed && ui.pressed]}>
             <View style={[styles.icon, { backgroundColor: category.color }]}><Text style={styles.emoji}>{category.icon}</Text></View>
             <View style={ui.flex}><Text style={ui.label}>{category.label}</Text><Text style={styles.categoryHint}>{category.hint}</Text></View>
@@ -160,15 +209,23 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Foto do local <Text style={styles.optional}>(opcional)</Text></Text>
-        <Notice>A foto será exibida inteira, sem recorte solicitado pelo FalaAí.</Notice>
+        <Notice>JPEG, PNG ou WebP de até 5 MiB. A foto será enviada ao Storage privado ao salvar, sem recorte solicitado pelo FalaAí.</Notice>
         <Button title={busy === 'camera' ? 'Abrindo câmera…' : 'Tirar foto'} secondary onPress={() => void pickImage('camera')} busy={busy === 'camera'} disabled={busy !== null} />
         <Button title={busy === 'gallery' ? 'Abrindo galeria…' : 'Escolher da galeria'} secondary onPress={() => void pickImage('gallery')} busy={busy === 'gallery'} disabled={busy !== null} />
         {photoError ? <Notice error>{photoError}</Notice> : null}
-        {photo && <><ReportPhoto uri={photo} /><Button title="Remover foto" secondary onPress={() => setPhoto(null)} disabled={busy !== null} /></>}
+        {photo && <><ReportPhoto uri={photo.uri} /><Button title={storedPhotoPath ? "Descartar nova foto" : "Remover foto"} secondary onPress={() => setPhoto(null)} disabled={busy !== null} /></>}
+        {!photo && storedPhotoPath && !removeStoredPhoto && <>
+          <StoredReportPhoto path={storedPhotoPath} />
+          <Button title="Remover foto salva" secondary onPress={() => setRemoveStoredPhoto(true)} disabled={busy !== null} />
+        </>}
+        {!photo && storedPhotoPath && removeStoredPhoto && <>
+          <Notice>A fotografia será removida somente ao salvar as alterações.</Notice>
+          <Button title="Manter foto salva" secondary onPress={() => setRemoveStoredPhoto(false)} disabled={busy !== null} />
+        </>}
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Descrição *</Text>
-        <TextInput ref={descriptionInput} accessibilityLabel="Descrição do problema, mínimo de 20 caracteres" style={[ui.input, styles.textArea, errors.description && ui.inputError]}
+        <TextInput editable={busy !== 'saving'} ref={descriptionInput} accessibilityLabel="Descrição do problema, mínimo de 20 caracteres" style={[ui.input, styles.textArea, errors.description && ui.inputError]}
           placeholder="Conte o que aconteceu..." placeholderTextColor="#64748b" multiline maxLength={400} value={description}
           onChangeText={(value) => { setDescription(value); clearFieldError('description'); }} />
         <Text style={styles.count}>{description.trim().length}/400 · mínimo de 20 caracteres</Text>
@@ -185,13 +242,13 @@ export default function NewReportScreen({ navigation }: StackScreenProps<'NewRep
           <Button title="Remover GPS e usar só endereço" secondary onPress={() => setCoordinates(null)} disabled={busy !== null} />
         </>}
         <Text style={ui.label}>Endereço ou ponto de referência</Text>
-        <TextInput ref={locationInput} accessibilityLabel="Endereço ou ponto de referência" style={[ui.input, errors.location && ui.inputError]} maxLength={200}
+        <TextInput editable={busy !== 'saving'} ref={locationInput} accessibilityLabel="Endereço ou ponto de referência" style={[ui.input, errors.location && ui.inputError]} maxLength={200}
           placeholder="Rua, número, bairro ou referência" placeholderTextColor="#64748b" value={location} onChangeText={(value) => { setLocation(value); clearFieldError('location'); }} />
         <Notice>Sem GPS, a ocorrência será listada com o endereço, sem marcador no mapa.</Notice>
         {errors.location && <Notice error>{errors.location}</Notice>}
       </View>
       {errors.form && <Notice error>{errors.form}</Notice>}
-      <Button title="Enviar ocorrência" onPress={handleSubmit} disabled={busy !== null} />
+      <Button title={reportId ? "Salvar alterações" : "Enviar ocorrência"} onPress={handleSubmit} busy={busy === 'saving'} disabled={busy !== null} />
     </ScrollView>
   </Screen>;
 }

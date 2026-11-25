@@ -1,10 +1,28 @@
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import OccurrenceFeedback from '../components/occurrence-feedback';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Notice, Screen, ui } from '../components/app-ui';
 import { AppColors as colors } from '../constants/theme';
+import AccountDeletionPanel from '../components/account-deletion-panel';
 import { useApp } from '../context/AppContext';
 
 export default function ProfileScreen() {
-  const { currentUser, occurrences, signOut } = useApp();
+  const { currentUser, occurrences, signOut, occurrencesLoading, occurrencesError, refreshOccurrences } = useApp();
+  useFocusEffect(useCallback(() => { void refreshOccurrences(); }, [refreshOccurrences]));
+  const countUnavailable = occurrences.length === 0 && (occurrencesLoading || !!occurrencesError);
+  const [leaving, setLeaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef(false);
+  async function handleSignOut() {
+    if (pending.current) return;
+    pending.current = true;
+    setLeaving(true);
+    setError(null);
+    try { await signOut(); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível sair. Tente novamente.'); }
+    finally { pending.current = false; setLeaving(false); }
+  }
   if (!currentUser) return null;
   const mine = occurrences.filter((report) => report.authorId === currentUser.id);
   const resolved = mine.filter((report) => report.status === 'Resolvida').length;
@@ -18,14 +36,15 @@ export default function ProfileScreen() {
     </View>
     <View style={ui.card}>
       <Text style={ui.sectionTitle}>Seus relatos</Text>
+      <OccurrenceFeedback loading={occurrencesLoading} error={occurrencesError} hasItems={occurrences.length > 0} onRefresh={refreshOccurrences} />
       <View style={styles.totalSummary}>
-        <Text style={styles.total}>{mine.length}</Text>
+        <Text style={styles.total}>{countUnavailable ? '—' : mine.length}</Text>
         <Text style={ui.body}>{mine.length === 1 ? 'ocorrência registrada' : 'ocorrências registradas'}</Text>
-        <Text style={ui.subtitle}>Nesta sessão do aplicativo</Text>
+        <Text style={ui.subtitle}>Persistidas na sua conta</Text>
       </View>
       <View style={styles.stats}>
-        <View style={styles.stat}><Text style={styles.statNumber}>{open}</Text><Text style={ui.subtitle}>Em aberto</Text></View>
-        <View style={styles.stat}><Text style={[styles.statNumber, { color: colors.success }]}>{resolved}</Text><Text style={ui.subtitle}>Resolvidas</Text></View>
+        <View style={styles.stat}><Text style={styles.statNumber}>{countUnavailable ? '—' : open}</Text><Text style={ui.subtitle}>Em aberto</Text></View>
+        <View style={styles.stat}><Text style={[styles.statNumber, { color: colors.success }]}>{countUnavailable ? '—' : resolved}</Text><Text style={ui.subtitle}>Resolvidas</Text></View>
       </View>
       <Notice>Novos relatos começam como “Aberta”. O protótipo não possui acompanhamento da prefeitura nem atualização de status.</Notice>
     </View>
@@ -34,12 +53,14 @@ export default function ProfileScreen() {
       <Text style={ui.body}>Participação cidadã com foto e localização.</Text>
       <Text style={ui.subtitle}>Versão 1.0 · protótipo acadêmico</Text>
       <View style={styles.academic}>
-        <Text style={ui.label}>Dados temporários</Text>
-        <Notice>Login demonstrativo, sem autenticação de produção. Ao sair, a sessão é encerrada. Cadastros, senhas e ocorrências ficam apenas na memória e são apagados ao reiniciar o aplicativo. Não use senhas reais.</Notice>
-        <Notice>Fotos podem usar arquivos temporários do aparelho. Não há garantia de conservação após encerrar o aplicativo.</Notice>
+        <Text style={ui.label}>Conta e dados</Text>
+        <Notice>Sua conta é autenticada pelo Supabase e a sessão é restaurada neste aparelho até você sair. A senha não é armazenada pelo aplicativo. Os relatos são salvos no Supabase e permanecem após sair ou reiniciar. Use uma senha exclusiva de teste.</Notice>
+        <Notice>Fotografias selecionadas são vinculadas aos relatos em Storage privado. A exibição usa acesso temporário autorizado; falhas de limpeza podem ser retomadas após reconectar.</Notice>
       </View>
     </View>
-    <Button title="Sair da conta" destructive onPress={signOut} />
+    <AccountDeletionPanel key={currentUser.id} ownerId={currentUser.id} />
+    {error && <Notice error>{error}</Notice>}
+    <Button title="Sair da conta" busy={leaving} destructive onPress={handleSignOut} />
   </ScrollView></Screen>;
 }
 const styles = StyleSheet.create({

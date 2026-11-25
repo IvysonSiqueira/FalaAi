@@ -48,7 +48,7 @@ function PhotoContent({ uri }: { uri: string }) {
   const [aspectRatio, setAspectRatio] = useState(4 / 3);
   if (failed) return <View style={[ui.card, ui.photoUnavailable]}>
     <Text style={ui.label}>Foto indisponível</Text>
-    <Notice>Não foi possível carregar esta foto. O arquivo pode não estar mais disponível neste dispositivo.</Notice>
+    <Notice>Não foi possível carregar esta foto. Confira a conexão e a disponibilidade do arquivo; para fotos remotas, tente atualizar o acesso.</Notice>
   </View>;
   return <View style={ui.photoFrame}>
     <Image accessibilityLabel="Foto completa da ocorrência" source={{ uri }} resizeMode="contain"

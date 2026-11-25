@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import OccurrenceFeedback from '../components/occurrence-feedback';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import OccurrenceMap from '../components/occurrence-map';
 import { Notice, OccurrenceCard, Screen, ui } from '../components/app-ui';
@@ -8,7 +10,9 @@ import { useApp } from '../context/AppContext';
 import type { CategoryId, TabScreenProps } from '../types';
 
 export default function MapScreen({ navigation }: TabScreenProps<'Mapa'>) {
-  const { occurrences } = useApp();
+  const { occurrences, occurrencesLoading, occurrencesError, refreshOccurrences } = useApp();
+  useFocusEffect(useCallback(() => { void refreshOccurrences(); }, [refreshOccurrences]));
+  const countUnavailable = occurrences.length === 0 && (occurrencesLoading || !!occurrencesError);
   const [filter, setFilter] = useState<CategoryId | 'all'>('all');
   const [showMap, setShowMap] = useState(true);
   const reports = filter === 'all' ? occurrences : occurrences.filter((report) => report.categoryId === filter);
@@ -16,7 +20,7 @@ export default function MapScreen({ navigation }: TabScreenProps<'Mapa'>) {
   const openReport = (reportId: string) => navigation.navigate('ReportDetail', { reportId });
 
   return <Screen tab>
-    <FlatList style={ui.flex} contentContainerStyle={ui.content} data={reports} keyExtractor={(item) => item.id}
+    <FlatList style={ui.flex} contentContainerStyle={ui.content} data={reports} refreshing={occurrencesLoading} onRefresh={() => void refreshOccurrences()} keyExtractor={(item) => item.id}
       ListHeaderComponent={<View style={styles.header}>
         <View style={styles.heading}>
           <Text style={[ui.title, ui.flex]}>Mapa</Text>
@@ -32,16 +36,17 @@ export default function MapScreen({ navigation }: TabScreenProps<'Mapa'>) {
             <Text style={[styles.chipText, filter === category.id && styles.activeText]}>{category.label}</Text>
           </Pressable>)}
         </ScrollView>
-        {showMap && <OccurrenceMap reports={reports} onSelect={openReport} />}
+        <OccurrenceFeedback loading={occurrencesLoading} error={occurrencesError} hasItems={occurrences.length > 0} onRefresh={refreshOccurrences} />
+        {showMap && !countUnavailable && <OccurrenceMap reports={reports} onSelect={openReport} />}
         <View style={styles.summary}>
           <Text style={ui.sectionTitle}>Ocorrências</Text>
-          <Text style={ui.subtitle}>{reports.length} registro(s) · {locatedCount} com GPS</Text>
+          <Text style={ui.subtitle}>{countUnavailable ? '—' : reports.length} registro(s) · {countUnavailable ? '—' : locatedCount} com GPS</Text>
         </View>
         {reports.length > locatedCount && <Notice>Registros com endereço manual aparecem na lista, sem marcador.</Notice>}
       </View>}
       renderItem={({ item }) => <OccurrenceCard report={item} onPress={() => openReport(item.id)} />}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
-      ListEmptyComponent={<View style={ui.card}>
+      ListEmptyComponent={occurrencesLoading || occurrencesError ? null : <View style={ui.card}>
         <Text style={ui.sectionTitle}>{occurrences.length ? 'Nenhum relato neste filtro' : 'Ainda não há ocorrências'}</Text>
         <Notice>{occurrences.length ? 'Escolha outra categoria ou selecione “Todas”.' : 'Use “Relatar um problema” no Início para adicionar o primeiro registro.'}</Notice>
       </View>}
