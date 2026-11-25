@@ -15,7 +15,8 @@ export function authErrorMessage(error: unknown): string {
     case 'user_already_exists': case 'email_exists': return 'Este e-mail já está cadastrado. Use a opção Entrar.';
     case 'weak_password': return 'Use uma senha com pelo menos 8 caracteres e siga os requisitos do serviço.';
     case 'email_address_invalid': case 'validation_failed': return 'Confira o e-mail e os dados informados.';
-    case 'over_email_send_rate_limit': case 'over_request_rate_limit': return 'Aguarde alguns minutos antes de tentar novamente. O serviço limitou as tentativas.';
+    case 'over_email_send_rate_limit': return 'O serviço atingiu o limite de envio de e-mails. Aguarde a liberação antes de tentar o cadastro novamente. Se já confirmou sua conta, use Entrar.';
+    case 'over_request_rate_limit': return 'Aguarde antes de tentar novamente. O serviço limitou as tentativas.';
     case 'signup_disabled': return 'O cadastro está desabilitado no serviço. Contate o responsável pelo projeto.';
   }
   if (error instanceof TypeError || (error && typeof error === 'object' && 'name' in error && error.name === 'AuthRetryableFetchError')) {

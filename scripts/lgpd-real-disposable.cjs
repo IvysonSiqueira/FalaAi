@@ -4,6 +4,7 @@ const {spawnSync}=require('node:child_process');const {randomUUID}=require('node
 const {createClient}=require('@supabase/supabase-js');
 const {validateTarget,scopedFetch,apiKeyHeaders}=require('../tests/helpers/lgpd-target.cjs');
 const {fixtureScope}=require('../tests/helpers/lgpd-fixtures.cjs');
+const {prepareArtifactDirectory}=require('./helpers/lgpd-artifacts.cjs');
 const {deleteAccount}=require('../supabase/functions/delete-account/core.ts');
 const root=path.resolve(__dirname,'..');process.chdir(root);
 const REF='ilkprwaxszztejsasmcs';const runId=randomUUID();
@@ -101,7 +102,7 @@ async function main(){
  const primary=new URL(app.EXPO_PUBLIC_SUPABASE_URL).hostname.split('.')[0];
  config=validateTarget({...env,FALAAI_LGPD_ALLOW_TESTS:'yes',FALAAI_LGPD_ALLOW_FIXTURE_DELETION:'yes'},true,primary);
  need(config.ref===REF&&config.url==='https://'+REF+'.supabase.co','DESTINATION');
- manifestFile=path.join(root,'.env.lgpd-fixtures-'+runId+'.local');reportFile=path.join(root,'.env.lgpd-results-'+runId+'.local');
+ ({manifestFile,reportFile}=prepareArtifactDirectory(root,runId));
  need([manifestFile,reportFile].every(file=>spawnSync('git',['check-ignore','--quiet','--',file]).status===0),'MANIFEST_NOT_IGNORED');
  fs.writeFileSync(manifestFile,'[]',{flag:'wx',mode:0o600});scope=fixtureScope(records=>fs.writeFileSync(manifestFile,JSON.stringify({runId,ref:REF,fixtures:records},null,2),{mode:0o600}));
  const scoped=scopedFetch(config.url);net=(u,o={})=>scoped(u,{...o,signal:o.signal||AbortSignal.timeout(30000)});

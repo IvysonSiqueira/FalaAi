@@ -26,7 +26,7 @@ com fotografias agora prepara upload para bucket privado, photo_path no banco,
 URLs assinadas, substituição e recuperação de limpeza. **A migração Storage ainda
 NÃO foi aplicada nem testada remotamente**; configure somente após confirmar o
 projeto de destino. Veja o [procedimento e roteiro Storage](docs/PROVA-III-STORAGE.md).
-Não há LGPD/exclusão de conta nem EAS Update publicado.
+A interface LGPD está preparada com ativação restrita ao ambiente descartável; a exclusão permanece desabilitada no projeto principal. EAS Update não foi publicado. Veja o [roteiro da interface e implantação controlada](docs/PROVA-III-INTERFACE-EXCLUSAO.md).
 
 **RLS entre A/B continua pendente:** em 21/11/2026 às 12h41, o cadastro de B foi
 limitado pelos envios de e-mail do Supabase; a conta aguarda verificação. Retomar
@@ -251,10 +251,26 @@ Abra o aplicativo FalaAí instalado e conecte-o ao Metro. O Development Build de
 
 Referências: [requisitos MapLibre](https://maplibre.org/maplibre-react-native/docs/setup/getting-started/), [plugin Expo](https://maplibre.org/maplibre-react-native/docs/setup/expo/), [OpenFreeMap](https://openfreemap.org/), [development builds](https://docs.expo.dev/develop/development-builds/introduction/).
 
-### Bônus de privacidade — preparação local (24/11/2026)
+### Bônus de privacidade — interface preparada (25/11/2026)
 
-Aviso e checkbox de cadastro preparados; registro formal do aceite depende da
-nova migração ainda não aplicada. Exclusão de conta permanece indisponível na
-interface, sem chamadas ao servidor. Migração e Edge Function não implantadas.
-Testes RLS A/B continuam pendentes por falha de autenticação de A. Consulte
-[preparação e roteiro LGPD](docs/PROVA-III-LGPD.md).
+O backend LGPD foi validado no projeto descartável, incluindo exclusão HTTP com
+250 fotos. A interface do Perfil oferece consulta do aviso e confirmação por senha,
+retomada de pendências e limpeza da sessão após confirmação do servidor. O projeto
+principal continua bloqueado por código e flags; não houve implantação nele.
+
+141 testes locais passaram. A validação visual/end-to-end da interface no Samsung
+continua pendente. O ESLint apresenta cinco erros preexistentes e três avisos,
+conforme comparação com o checkpoint. Consulte os [resultados integrados](docs/PROVA-III-RESULTADO-LGPD-INTEGRADO.md)
+e o [roteiro da interface, teste isolado e implantação](docs/PROVA-III-INTERFACE-EXCLUSAO.md).
+
+
+### Metro Android em desenvolvimento
+
+A configuração Metro exclui ambientes, artefatos privados e infraestrutura de testes
+do grafo do cliente. Evidências locais ficam em `.artifacts/lgpd/`, ignoradas pelo Git.
+Para validar com o Metro isolado ativo, use `node scripts/verify-metro-dev.cjs`.
+Veja a [causa e validação do bundling de desenvolvimento](docs/PROVA-III-CORRECAO-METRO-DEV.md).
+
+### Conclusão da validação LGPD mobile
+
+Exclusão manual de DEMO_A no Samsung validada; verificador confirmou remoção integral e preservação de DEMO_B, incluindo conteúdo das duas fotos. Trava do projeto descartável restabelecida (503 disabled). LGPD não implantada no projeto principal. Consulte [evidências, pendências e roteiro final](docs/PROVA-III-CONCLUSAO-MOBILE.md).

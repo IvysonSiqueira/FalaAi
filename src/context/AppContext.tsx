@@ -6,6 +6,8 @@ import { createAuthService, observeSession, type Credentials, type RegistrationR
 
 import { createOccurrencePhotos, type OccurrencePhotos } from '../services/occurrence-photos';
 import { createOccurrenceMediaService } from '../services/occurrence-media';
+import { createAccountDeletionService, clearDeletedSession, deletionEnabled, type DeletionResult } from '../services/account-deletion';
+import { readSupabaseConfig } from '../lib/supabase-config';
 import { getCategory } from '../constants/categories';
 import { createOccurrenceService } from '../services/occurrences';
 import { createOccurrenceStore, type OccurrenceState, type OccurrenceStore } from '../services/occurrence-store';
@@ -22,6 +24,10 @@ type AppContextValue = {
   signIn: (credentials: Credentials) => Promise<void>;
   registerUser: (credentials: Credentials) => Promise<RegistrationResult>;
   signOut: () => Promise<void>;
+  accountDeletionEnabled: boolean;
+  requestAccountDeletion: (password: string) => Promise<DeletionResult>;
+  checkAccountDeletionPending: () => Promise<boolean | null>;
+  finishAccountDeletion: (ownerId: string) => Promise<void>;
   occurrencesLoading: boolean;
   occurrencesError: string | null;
   refreshOccurrences: () => Promise<void>;
@@ -42,6 +48,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reportStore = useRef<{ ownerId: string; store: OccurrenceStore } | null>(null);
   const [photoCleanupWarning, setPhotoCleanupWarning] = useState<string | null>(null);
   const photoService = useRef<{ ownerId: string; photos: OccurrencePhotos; recover: () => Promise<void> } | null>(null);
+  const deletionService = useRef<{ ownerId: string; service: ReturnType<typeof createAccountDeletionService> } | null>(null);
+  const accountDeletionEnabled = deletionEnabled(process.env.EXPO_PUBLIC_SUPABASE_URL,
+    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_ENABLED, process.env.EXPO_PUBLIC_ACCOUNT_DELETION_PROJECT_REF);
   const identity = useRef<string | null>(null);
   const userId = session?.user.id ?? null;
   const userEmail = session?.user.email ?? '';
@@ -63,6 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           reportStore.current?.store.dispose();
           reportStore.current = null;
           photoService.current = null;
+          deletionService.current = null;
           setPhotoCleanupWarning(null);
           setReports({ items: [], loading: true, error: null, ownerId: null });
         }
@@ -99,6 +109,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await createAuthService(getSupabaseClient()).signOut();
   }
+  const activeDeletionService = useCallback(() => {
+    const ownerId = identity.current;
+    if (!ownerId) throw new Error('Entre novamente para confirmar sua identidade.');
+    if (deletionService.current?.ownerId === ownerId) return deletionService.current.service;
+    const config = readSupabaseConfig(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+    if (!config) throw new Error('Serviço indisponível.');
+    const service = createAccountDeletionService(getSupabaseClient(), config, ownerId, accountDeletionEnabled);
+    deletionService.current = { ownerId, service };
+    return service;
+  }, [accountDeletionEnabled]);
+  const requestAccountDeletion = useCallback(async (password: string) => {
+    if (!accountDeletionEnabled) return { kind: 'disabled' as const };
+    return activeDeletionService().request(password);
+  }, [accountDeletionEnabled, activeDeletionService]);
+  const checkAccountDeletionPending = useCallback(async () => {
+    if (!accountDeletionEnabled) return false;
+    return activeDeletionService().pending();
+  }, [accountDeletionEnabled, activeDeletionService]);
+  const finishAccountDeletion = useCallback(async (ownerId: string) => {
+    if (identity.current && identity.current !== ownerId) throw new Error('A sessão mudou. Não foi alterada a conta atual.');
+    await clearDeletedSession(getSupabaseClient(), () => {
+      if (identity.current && identity.current !== ownerId) return;
+      reportStore.current?.store.dispose();
+      reportStore.current = null;
+      photoService.current = null;
+      deletionService.current = null;
+      identity.current = null;
+      setReports({ items: [], loading: false, error: null, ownerId: null });
+      setPhotoCleanupWarning(null);
+      setProfile(null);
+      setSession(null);
+      setAuthError(null);
+      setRestoring(false);
+    });
+  }, []);
   const reportOwner = currentUser?.id ?? null;
   useEffect(() => {
     if (!reportOwner) return;
@@ -147,6 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return <AppContext.Provider value={{ currentUser, photoCleanupWarning, getPhotoUrl, retryPhotoCleanup, occurrences: visibleReports ? reports.items : [],
     occurrencesLoading: !visibleReports || reports.loading, occurrencesError: visibleReports ? reports.error : null,
     refreshOccurrences, loadOccurrence, updateOccurrence, deleteOccurrence, authLoading: restoring || (!!userId && !currentUser && !authError), authError,
+    accountDeletionEnabled, requestAccountDeletion, checkAccountDeletionPending, finishAccountDeletion,
     retryAuth: () => setAttempt((value) => value + 1), signIn, registerUser, signOut, addOccurrence }}>{children}</AppContext.Provider>;
 }
 

@@ -32,6 +32,18 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      privacy_acceptances: {
+        Row: { user_id: string; version: string; accepted_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      account_deletion_requests: {
+        Row: { user_id: string; requested_at: string; state: 'cleaning' | 'ready' };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       occurrences: {
         Row: OccurrenceRow;
         Insert: OccurrenceInput;

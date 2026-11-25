@@ -84,8 +84,8 @@ A interface deverá tratar sessão encerrada e erros recuperáveis com clareza.
 
 ## Evidências locais e arquivos
 
-- Manifesto: .env.lgpd-fixtures-53485b20-e132-4cd6-8a77-14ed57ccae1e.local (ignorado; somente IDs/caminhos).
-- Resultado original: .env.lgpd-results-53485b20-e132-4cd6-8a77-14ed57ccae1e.local (ignorado).
+- Manifesto: .artifacts/lgpd/53485b20-e132-4cd6-8a77-14ed57ccae1e/fixtures.json (ignorado; somente IDs/caminhos).
+- Resultado original: .artifacts/lgpd/53485b20-e132-4cd6-8a77-14ed57ccae1e/results.json (ignorado).
 - Executor: scripts/lgpd-real-disposable.cjs; guard: tests/helpers/lgpd-fixtures.cjs.
 - Testes do guard: tests/lgpd-fixtures.test.cjs; red-green executado localmente.
 - 109 testes locais aprovados, TypeScript sem emissão aprovado e git diff --check
@@ -104,3 +104,5 @@ ou provedor SMTP/sandbox apropriado, configurado localmente sem senhas pelo chat
 Não considerar envio/confirmação de e-mail validado por contas confirmadas via API
 administrativa. Para falhas internas reais do Edge e janela de 24h, manter os
 limites acima explícitos; não enfraquecer regras nem acelerar prazos de limpeza.
+
+Evidências arquivadas sem alteração de conteúdo na correção Metro; veja PROVA-III-CORRECAO-METRO-DEV.md.

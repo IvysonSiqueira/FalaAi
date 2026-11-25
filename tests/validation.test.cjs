@@ -34,3 +34,12 @@ test('categorias têm IDs distintos e metadados compartilhados pelo cadastro e m
     assert.match(category.pinColor, /^#[\da-f]{6}$/i);
   }
 });
+
+test('login aceita contas demonstrativas e rejeita domínio sem ponto e espaços internos', () => {
+  for (const email of ['demo.a@example.com', 'demo.b@example.com', 'lgpd-demo-a-12345678-abcd-1234-abcd-123456789abc@example.com', 'samuel@site.com']) {
+    assert.equal(isValidEmail(email), true);
+  }
+  for (const email of ['demo@example', 'demo@example com', 'demo\t@example.com', 'demo@example.com\nextra']) {
+    assert.equal(isValidEmail(email), false);
+  }
+});

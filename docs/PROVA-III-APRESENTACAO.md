@@ -31,12 +31,10 @@ Nenhum vídeo foi gravado ou voz sintetizada automaticamente.
 
 ## O que declarar com precisão
 
-- Validado no Samsung pelo aluno: Auth, sessão, CRUD, fotos e operações principais.
-- Testes Node e TypeScript são verificações locais; não provam RLS remoto.
-- UI esconde editar/excluir de outro autor; bloqueio direto de API ainda precisa
-  de teste com duas contas autenticáveis.
-- LGPD: aviso/checkbox e servidor preparados; aceite formal depende da migração,
-  exclusão permanece indisponível. Não reivindicar bônus completo sem validação.
+- Auth, sessão, CRUD e fotos foram validados pelo aluno no Samsung.
+- RLS e exclusão foram testados no projeto descartável; a conclusão mobile e os limites estão em PROVA-III-CONCLUSAO-MOBILE.md.
+- Exclusão de A confirmada remotamente, B preservada inclusive fotos; trava restabelecida.
+- Bônus ainda não implantado no principal. Cadastro público com aceite e confirmação por e-mail no descartável seguem pendentes.
 - Não existe acompanhamento oficial da prefeitura nem atualização automática de status.
 
 ## Finalização

@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import OccurrenceFeedback from '../components/occurrence-feedback';
-import { useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Notice, Screen, ui } from '../components/app-ui';
 import { AppColors as colors } from '../constants/theme';
+import AccountDeletionPanel from '../components/account-deletion-panel';
 import { useApp } from '../context/AppContext';
 
 export default function ProfileScreen() {
@@ -58,15 +58,7 @@ export default function ProfileScreen() {
         <Notice>Fotografias selecionadas são vinculadas aos relatos em Storage privado. A exibição usa acesso temporário autorizado; falhas de limpeza podem ser retomadas após reconectar.</Notice>
       </View>
     </View>
-    <View style={ui.card}>
-      <Text style={ui.sectionTitle}>Privacidade</Text>
-      <Notice>A exclusão está em preparação e ainda não envia solicitações ao servidor.</Notice>
-      <Button title="Solicitar exclusão da minha conta" destructive onPress={() => Alert.alert(
-        'Excluir minha conta',
-        'A operação definitiva removerá sua conta, relatos e fotografias. O recurso está bloqueado até os testes de segurança e implantação. Nenhum dado será excluído agora.',
-        [{ text: 'Voltar', style: 'cancel' }, { text: 'Entendi — recurso indisponível' }],
-      )} />
-    </View>
+    <AccountDeletionPanel key={currentUser.id} ownerId={currentUser.id} />
     {error && <Notice error>{error}</Notice>}
     <Button title="Sair da conta" busy={leaving} destructive onPress={handleSignOut} />
   </ScrollView></Screen>;

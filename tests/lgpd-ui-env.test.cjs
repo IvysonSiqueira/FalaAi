@@ -1,0 +1,5 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {lgpdUiEnvironment}=require('../scripts/helpers/lgpd-ui-env.cjs');
+const ref='ilkprwaxszztejsasmcs';const c={ref,url:'https://'+ref+'.supabase.co',publicKey:'sb_publishable_test'};
+test('Metro isolado não herda admin keys, tokens ou EXPO_PUBLIC do principal',()=>{const env=lgpdUiEnvironment({PATH:'/bin',SUPABASE_ACCESS_TOKEN:'private-token',FALAAI_LGPD_ADMIN_KEY:'admin',EXPO_PUBLIC_OTHER:'bad',EXPO_PUBLIC_SUPABASE_URL:'main'},c);assert.equal(env.EXPO_NO_DOTENV,'1');assert.equal(env.EXPO_PUBLIC_SUPABASE_URL,c.url);assert.equal(env.EXPO_PUBLIC_ACCOUNT_DELETION_ENABLED,'true');assert.ok(!JSON.stringify(env).includes('private-token'));assert.ok(!JSON.stringify(env).includes('admin'));assert.equal(env.EXPO_PUBLIC_OTHER,undefined)});
+test('lançador recusa principal e chave administrativa',()=>{assert.throws(()=>lgpdUiEnvironment({}, {...c,ref:'wxmsqhmifqvtrlgosrjp'}));assert.throws(()=>lgpdUiEnvironment({}, {...c,publicKey:'sb_secret_test'}))});

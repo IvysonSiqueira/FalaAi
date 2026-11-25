@@ -87,3 +87,7 @@ test('perfil usa UUID do Auth e falha fechado quando RLS/rede impede consulta', 
     return true;
   });
 });
+test('limite de email é distinguido do limite geral sem prometer prazo de liberação', () => {
+  assert.match(authErrorMessage({ code: 'over_email_send_rate_limit' }), /envio de e-mails/);
+  assert.doesNotMatch(authErrorMessage({ code: 'over_request_rate_limit' }), /envio de e-mails/);
+});
