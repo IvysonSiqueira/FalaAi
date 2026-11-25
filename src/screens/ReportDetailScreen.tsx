@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Linking, ScrollView, Text, View } from 'react-native';
 import { BackHeader, Button, Notice, Screen, StatusBadge, ui } from '../components/app-ui';
@@ -14,6 +14,7 @@ export default function ReportDetailScreen({ route, navigation }: StackScreenPro
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const request = useMemo(() => ({ id: reportId, attempt }), [reportId, attempt]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const pending = useRef(false);
@@ -26,11 +27,11 @@ export default function ReportDetailScreen({ route, navigation }: StackScreenPro
     setLoading(true);
     setError(null);
     setConfirmDelete(false);
-    void loadOccurrence(reportId).catch((failure: unknown) => {
+    void loadOccurrence(request.id).catch((failure: unknown) => {
       if (active) setError(failure instanceof Error ? failure.message : 'Não foi possível carregar a ocorrência.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [reportId, loadOccurrence, attempt]));
+  }, [request, loadOccurrence]));
 
   async function remove() {
     if (!own || pending.current) return;

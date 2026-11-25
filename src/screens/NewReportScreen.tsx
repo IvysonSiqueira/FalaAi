@@ -13,7 +13,11 @@ import type { CategoryId, Coordinates, SelectedPhoto, StackScreenProps } from '.
 
 type FormErrors = { description?: string; location?: string; form?: string };
 
-export default function NewReportScreen({ route, navigation }: StackScreenProps<'NewReport'>) {
+export default function NewReportScreen(props: StackScreenProps<'NewReport'>) {
+  const { currentUser } = useApp();
+  return <ReportForm key={`${currentUser?.id ?? ''}:${props.route.params?.reportId ?? 'new'}`} {...props} />;
+}
+function ReportForm({ route, navigation }: StackScreenProps<'NewReport'>) {
   const { currentUser, addOccurrence, updateOccurrence, loadOccurrence } = useApp();
   const reportId = route.params?.reportId;
   const [loading, setLoading] = useState(!!reportId);
@@ -48,8 +52,6 @@ export default function NewReportScreen({ route, navigation }: StackScreenProps<
   useEffect(() => {
     if (!reportId) return;
     let active = true;
-    setLoading(true);
-    setLoadError(null);
     void loadOccurrence(reportId).then((report) => {
       if (!active) return;
       if (!report) throw new Error('Ocorrência não encontrada. Ela pode ter sido excluída.');
@@ -179,7 +181,7 @@ export default function NewReportScreen({ route, navigation }: StackScreenProps<
     <ScrollView contentContainerStyle={ui.content}>
       {loading ? <Notice>Carregando ocorrência…</Notice> : <>
         <Notice error>{loadError}</Notice>
-        <Button title="Tentar novamente" onPress={() => setLoadAttempt((value) => value + 1)} />
+        <Button title="Tentar novamente" onPress={() => { setLoading(true); setLoadError(null); setLoadAttempt((value) => value + 1); }} />
       </>}
     </ScrollView>
   </Screen>;

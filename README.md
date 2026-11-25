@@ -21,20 +21,23 @@ proprietário e confirmação antes de excluir. UUID, proprietário, status inic
 e datas são definidos pelo banco. As telas compartilham o cache no AppContext e
 atualizam ao ganhar foco ou ao solicitar atualização.
 
-O responsável validou o CRUD real no Samsung Galaxy S23 Ultra. A integração local
-com fotografias agora prepara upload para bucket privado, photo_path no banco,
-URLs assinadas, substituição e recuperação de limpeza. **A migração Storage ainda
-NÃO foi aplicada nem testada remotamente**; configure somente após confirmar o
-projeto de destino. Veja o [procedimento e roteiro Storage](docs/PROVA-III-STORAGE.md).
-A interface LGPD está preparada com ativação restrita ao ambiente descartável; a exclusão permanece desabilitada no projeto principal. EAS Update não foi publicado. Veja o [roteiro da interface e implantação controlada](docs/PROVA-III-INTERFACE-EXCLUSAO.md).
+CRUD e fotografias foram validados no Samsung: upload, leitura após reiniciar,
+substituição e exclusão no Storage privado. A UI mantém a proporção original das
+imagens. Migrações 001/002 estão aplicadas no principal conforme as validações do
+responsável; não as reaplique. Consulte [Storage](docs/PROVA-III-STORAGE.md).
 
-**RLS entre A/B continua pendente:** em 21/11/2026 às 12h41, o cadastro de B foi
-limitado pelos envios de e-mail do Supabase; a conta aguarda verificação. Retomar
-obrigatoriamente os testes remotos após integrar as fotografias, sem considerar
-RLS validado apenas pelo funcionamento da conta A.
+A LGPD foi validada integralmente no projeto descartável: testes integrados, aceite
+no servidor e exclusão manual no Samsung, com remoção integral de A e preservação
+de B, inclusive conteúdo das fotos. A função voltou a `503 disabled`.
+**A migração 003 e a exclusão LGPD não estão liberadas no projeto principal.**
+Cadastro público com aceite e confirmação por e-mail no descartável continuam
+pendentes por limite do serviço; criação por Auth Admin não substitui esse teste.
+O teste RLS remoto entre contas passou no descartável; não o confundir com
+aprovação automática do ambiente principal. EAS Update não foi publicado.
 
-Protótipo acadêmico com Expo SDK 57, React Native, TypeScript e React Navigation.
-Prazo da Prova III: 24/11/2026 às 23h59 (America/Maceio).
+Conclusão indicada: 24/11/2026; fechamento dos envios: **27/11/2026**.
+[Resultado e apresentação](docs/PROVA-III-CONCLUSAO-MOBILE.md) ·
+[Plano da release candidate](docs/PROVA-III-RELEASE-CANDIDATE.md).
 
 ## Base validada na Prova II
 
@@ -42,7 +45,7 @@ O Development Build Android com MapLibre foi gerado, instalado e testado em apar
 
 Na Prova II, fotografias locais eram exibidas na prévia e nos detalhes. Na integração atual, a prévia permanece sem recorte e fotos remotas voltam aos detalhes após configurar o Storage privado. Os cartões priorizam categoria, status, descrição, localização e data; coordenadas numéricas ficam nos detalhes, além do feedback de captura de GPS no formulário.
 
-Na Prova II, TypeScript, 11 testes automatizados e `git diff --check` passaram. A nova autenticação da Prova III tem testes próprios; validação Android dessa integração permanece pendente.
+Na Prova II, TypeScript, 11 testes automatizados e `git diff --check` passaram. A nova autenticação da Prova III tem testes próprios; essa integração também foi validada no Samsung pelo responsável.
 
 ## Executar pelo Metro e Development Build
 
@@ -151,7 +154,7 @@ Para conferir bundling sem publicar:
 CI=1 EXPO_NO_TELEMETRY=1 ./node_modules/.bin/expo export --platform all --output-dir /private/tmp/falaai-prova-export --no-minify
 ```
 
-Não há ESLint instalado/configurado; o script legado `npm run lint` chama `expo lint`, que pode propor instalação. Ele não foi executado para evitar alterar dependências. Bundling e TypeScript não substituem teste em aparelho.
+ESLint não é dependência permanente: a validação RC usa eslint 9.39.5 e eslint-config-expo 57.0.2 em cache externo, sem instalar no projeto. Não execute `npm run lint` aceitando instalações automáticas. Consulte o relatório RC para escopo/resultados. Bundling e TypeScript não substituem teste em aparelho.
 
 ## Roteiro de teste e apresentação
 
@@ -259,7 +262,7 @@ retomada de pendências e limpeza da sessão após confirmação do servidor. O 
 principal continua bloqueado por código e flags; não houve implantação nele.
 
 141 testes locais passaram. A validação visual/end-to-end da interface no Samsung
-continua pendente. O ESLint apresenta cinco erros preexistentes e três avisos,
+continua pendente. O baseline histórico do ESLint apresentou cinco erros e três avisos,
 conforme comparação com o checkpoint. Consulte os [resultados integrados](docs/PROVA-III-RESULTADO-LGPD-INTEGRADO.md)
 e o [roteiro da interface, teste isolado e implantação](docs/PROVA-III-INTERFACE-EXCLUSAO.md).
 

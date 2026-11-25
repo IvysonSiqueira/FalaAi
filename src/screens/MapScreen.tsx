@@ -1,7 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import OccurrenceFeedback from '../components/occurrence-feedback';
-import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import OccurrenceMap from '../components/occurrence-map';
 import { Notice, OccurrenceCard, Screen, ui } from '../components/app-ui';

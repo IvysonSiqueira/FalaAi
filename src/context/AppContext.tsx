@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { Occurrence, OccurrenceDraft, User } from '../types';
 import { getSupabaseClient, observeAuthAppState } from '../lib/supabase';
@@ -42,8 +42,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authFailure, setAuthError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const initialization = useMemo(() => {
+    try { return { client: getSupabaseClient(), error: null }; }
+    catch { return { client: null, error: 'Não foi possível iniciar a autenticação. Confira o .env.local e se o Development Build inclui AsyncStorage.' }; }
+  }, []);
+  const authError = initialization.error ?? authFailure;
   const [reports, setReports] = useState<OccurrenceState & { ownerId: string | null }>({ items: [], loading: true, error: null, ownerId: null });
   const reportStore = useRef<{ ownerId: string; store: OccurrenceStore } | null>(null);
   const [photoCleanupWarning, setPhotoCleanupWarning] = useState<string | null>(null);
@@ -57,12 +62,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const currentUser = profile?.id === userId ? profile : null;
 
   useEffect(() => {
-    setRestoring(true);
-    setAuthError(null);
     let stopSession = () => {};
     let stopRefresh = () => {};
-    try {
-      const client = getSupabaseClient();
+    const client = initialization.client;
+    if (!client) return;
+    {
       stopSession = observeSession(client, (next) => {
         const nextId = next?.user.id ?? null;
         if (identity.current !== nextId) {
@@ -80,15 +84,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRestoring(false);
       }, (message) => { setAuthError(message); setRestoring(false); });
       stopRefresh = observeAuthAppState(client);
-    } catch {
-      setAuthError('Não foi possível iniciar a autenticação. Confira o .env.local e se o Development Build inclui AsyncStorage.');
-      setRestoring(false);
     }
     return () => { stopSession(); stopRefresh(); };
-  }, [attempt]);
+  }, [attempt, initialization]);
 
   useEffect(() => {
-    if (!userId) { setProfile(null); return; }
+    if (!userId) return;
     let active = true;
     // Efeito separado do callback Auth; protege respostas após logout/desmontagem.
     void createAuthService(getSupabaseClient()).loadProfile(userId, userEmail).then((user) => {
@@ -191,9 +192,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return <AppContext.Provider value={{ currentUser, photoCleanupWarning, getPhotoUrl, retryPhotoCleanup, occurrences: visibleReports ? reports.items : [],
     occurrencesLoading: !visibleReports || reports.loading, occurrencesError: visibleReports ? reports.error : null,
-    refreshOccurrences, loadOccurrence, updateOccurrence, deleteOccurrence, authLoading: restoring || (!!userId && !currentUser && !authError), authError,
+    refreshOccurrences, loadOccurrence, updateOccurrence, deleteOccurrence, authLoading: (restoring && !initialization.error) || (!!userId && !currentUser && !authError), authError,
     accountDeletionEnabled, requestAccountDeletion, checkAccountDeletionPending, finishAccountDeletion,
-    retryAuth: () => setAttempt((value) => value + 1), signIn, registerUser, signOut, addOccurrence }}>{children}</AppContext.Provider>;
+    retryAuth: () => { setRestoring(true); setAuthError(null); setAttempt((value) => value + 1); }, signIn, registerUser, signOut, addOccurrence }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
